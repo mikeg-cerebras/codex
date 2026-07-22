@@ -34,7 +34,7 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 use core_test_support::TestTargetOs;
 use core_test_support::hooks::trust_discovered_hooks;
 use core_test_support::hooks::trust_hooks;
-use core_test_support::managed_network_requirements_loader;
+use core_test_support::managed_network_requirements_overrides;
 use core_test_support::responses::ev_apply_patch_custom_tool_call;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
@@ -2909,7 +2909,7 @@ allow_local_binding = true
             )
             .expect("failed to write permission request hook test fixture");
         })
-        .with_cloud_config_bundle(managed_network_requirements_loader())
+        .with_loader_overrides(managed_network_requirements_overrides())
         .with_config(move |config| {
             trust_discovered_hooks(config);
             config.approvals_reviewer = codex_config::types::ApprovalsReviewer::AutoReview;

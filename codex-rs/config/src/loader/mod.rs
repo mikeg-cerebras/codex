@@ -86,7 +86,6 @@ async fn first_layer_config_error_from_entries(layers: &[ConfigLayerEntry]) -> O
 ///
 /// - system    `/etc/codex/requirements.toml` (Unix) or
 ///   `%ProgramData%\OpenAI\Codex\requirements.toml` (Windows)
-/// - cloud:    enterprise-managed cloud config bundle requirements
 /// - legacy:   managed_config.toml reinterpreted as requirements.toml
 /// - admin:    managed preferences (*)
 ///
@@ -134,7 +133,6 @@ pub async fn load_config_layers_state(
     let ignore_user_and_project_exec_policy_rules =
         overrides.ignore_user_and_project_exec_policy_rules;
     let mut requirements_layers = Vec::new();
-    let mut bundle_requirements_layers = Vec::new();
     let mut system_requirements_layer = None;
     let managed_preferences_requirements_layer;
     let mut cloud_config_layers = Vec::new();
@@ -147,12 +145,7 @@ pub async fn load_config_layers_state(
             } else {
                 CloudConfigBundleLayers::from_bundle(bundle, &cloud_config_base_dir)?
             };
-            let CloudConfigBundleLayers {
-                enterprise_managed_config,
-                enterprise_managed_requirements,
-            } = bundle_layers;
-            bundle_requirements_layers = enterprise_managed_requirements;
-            cloud_config_layers = enterprise_managed_config;
+            cloud_config_layers = bundle_layers.enterprise_managed_config;
         }
 
         #[cfg(target_os = "macos")]
@@ -183,7 +176,6 @@ pub async fn load_config_layers_state(
             .await?;
     if !ignore_managed_requirements {
         requirements_layers.extend(system_requirements_layer);
-        requirements_layers.extend(bundle_requirements_layers);
         // Continue to support the legacy `managed_config.toml` locations as
         // requirements layers for backwards compatibility.
         requirements_layers.extend(requirements_layers_from_legacy_scheme(

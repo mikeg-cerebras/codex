@@ -66,9 +66,6 @@ pub(crate) fn bundle_shape_tag(bundle: Option<&CloudConfigBundle>) -> String {
     if !bundle.config_toml.enterprise_managed.is_empty() {
         sources.push("enterprise_config");
     }
-    if !bundle.requirements_toml.enterprise_managed.is_empty() {
-        sources.push("enterprise_requirements");
-    }
 
     if sources.is_empty() {
         "empty".to_string()

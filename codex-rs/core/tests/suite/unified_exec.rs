@@ -21,7 +21,7 @@ use codex_utils_output_truncation::approx_tokens_from_byte_count;
 use codex_utils_path_uri::PathUri;
 use core_test_support::TempDirExt;
 use core_test_support::assert_regex_match;
-use core_test_support::managed_network_requirements_loader;
+use core_test_support::managed_network_requirements_overrides;
 use core_test_support::process::process_is_alive;
 use core_test_support::process::wait_for_pid_file;
 use core_test_support::process::wait_for_process_exit;
@@ -934,7 +934,7 @@ allow_local_binding = true
     let permission_profile = permission_profile_for_config.clone();
     let mut builder = test_codex()
         .with_home(home)
-        .with_cloud_config_bundle(managed_network_requirements_loader())
+        .with_loader_overrides(managed_network_requirements_overrides())
         .with_config(move |config| {
             config.use_experimental_unified_exec_tool = true;
             config

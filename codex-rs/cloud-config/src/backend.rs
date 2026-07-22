@@ -4,8 +4,6 @@ use codex_backend_client::DeliveredTomlFragment;
 use codex_config::CloudConfigBundle;
 use codex_config::CloudConfigFragment;
 use codex_config::CloudConfigTomlBundle;
-use codex_config::CloudRequirementsFragment;
-use codex_config::CloudRequirementsTomlBundle;
 use codex_http_client::HttpClientFactory;
 use codex_login::CodexAuth;
 use std::future::Future;
@@ -97,38 +95,16 @@ pub(crate) fn bundle_from_response(response: ConfigBundleResponse) -> CloudConfi
         .into_iter()
         .map(config_fragment_from_delivered)
         .collect();
-    let requirements_toml = response
-        .requirements_toml
-        .flatten()
-        .map(|requirements_toml| *requirements_toml)
-        .and_then(|requirements_toml| requirements_toml.enterprise_managed.flatten())
-        .unwrap_or_default()
-        .into_iter()
-        .map(requirements_fragment_from_delivered)
-        .collect();
 
     CloudConfigBundle {
         config_toml: CloudConfigTomlBundle {
             enterprise_managed: config_toml,
-        },
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: requirements_toml,
         },
     }
 }
 
 fn config_fragment_from_delivered(fragment: DeliveredTomlFragment) -> CloudConfigFragment {
     CloudConfigFragment {
-        id: fragment.id,
-        name: fragment.name,
-        contents: fragment.contents,
-    }
-}
-
-fn requirements_fragment_from_delivered(
-    fragment: DeliveredTomlFragment,
-) -> CloudRequirementsFragment {
-    CloudRequirementsFragment {
         id: fragment.id,
         name: fragment.name,
         contents: fragment.contents,

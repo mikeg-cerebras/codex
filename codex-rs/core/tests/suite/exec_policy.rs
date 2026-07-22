@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
 use anyhow::Result;
-use codex_config::test_support::CloudConfigBundleFixture;
+use codex_config::LoaderOverrides;
 use codex_features::Feature;
 use codex_protocol::config_types::CollaborationMode;
 use codex_protocol::config_types::ModeKind;
@@ -457,17 +457,22 @@ async fn malformed_custom_rules_preserve_managed_forbidden_prefix() -> Result<()
         "managed prefix fixture uses POSIX executable semantics"
     );
 
-    let mut builder = test_codex()
-        .with_cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
+    let requirements_dir = tempfile::tempdir()?;
+    let requirements_path = requirements_dir.keep().join("requirements.toml");
+    fs::write(
+        &requirements_path,
+        r#"
 [rules]
 prefix_rules = [
     { pattern = [{ token = "echo" }], decision = "forbidden" },
 ]
 "#,
-            ),
-        )
+    )?;
+    let mut builder = test_codex()
+        .with_loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .with_config(|config| {
             config
                 .features

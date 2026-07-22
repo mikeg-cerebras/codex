@@ -239,7 +239,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codex_config::test_support::CloudConfigBundleFixture;
+    use codex_config::LoaderOverrides;
     use codex_models_manager::bundled_models_response;
     use pretty_assertions::assert_eq;
     use std::path::Path;
@@ -438,12 +438,15 @@ sandbox_private_desktop = false
             log_dir.display(),
             catalog_path.display(),
         );
-        let mut config = crate::config::ConfigBuilder::without_managed_config_for_tests()
+        let requirements_path = codex_home.path().join("requirements.toml");
+        std::fs::write(&requirements_path, &requirements).expect("write requirements.toml");
+        let mut config = crate::config::ConfigBuilder::default()
             .codex_home(codex_home.path().to_path_buf())
             .fallback_cwd(Some(codex_home.path().to_path_buf()))
-            .cloud_config_bundle(
-                CloudConfigBundleFixture::loader_with_enterprise_requirement(requirements),
-            )
+            .loader_overrides(LoaderOverrides {
+                system_requirements_path: Some(requirements_path),
+                ..LoaderOverrides::without_managed_config_for_tests()
+            })
             .build()
             .await
             .expect("config should load");

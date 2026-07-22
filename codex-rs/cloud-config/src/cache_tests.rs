@@ -2,8 +2,6 @@ use super::*;
 use codex_config::AbsolutePathBuf;
 use codex_config::CloudConfigFragment;
 use codex_config::CloudConfigTomlBundle;
-use codex_config::CloudRequirementsFragment;
-use codex_config::CloudRequirementsTomlBundle;
 use pretty_assertions::assert_eq;
 use std::path::Path;
 use tempfile::tempdir;
@@ -15,13 +13,6 @@ fn test_bundle() -> CloudConfigBundle {
                 id: "cfg_1".to_string(),
                 name: "Base config".to_string(),
                 contents: "model = \"gpt-5\"".to_string(),
-            }],
-        },
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: vec![CloudRequirementsFragment {
-                id: "req_1".to_string(),
-                name: "Base requirements".to_string(),
-                contents: "allowed_approval_policies = [\"never\"]".to_string(),
             }],
         },
     }
@@ -144,9 +135,9 @@ async fn load_rejects_tampered_payload() {
     cache_file
         .signed_payload
         .bundle
-        .requirements_toml
+        .config_toml
         .enterprise_managed[0]
-        .contents = "allowed_approval_policies = [\"on-request\"]".to_string();
+        .contents = "model = \"tampered\"".to_string();
     write_cache_file(&cache, &cache_file);
 
     assert_eq!(

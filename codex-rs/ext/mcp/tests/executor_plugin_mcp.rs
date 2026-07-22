@@ -1,6 +1,6 @@
-use codex_config::test_support::CloudConfigBundleFixture;
 use codex_core::config::Config;
 use codex_core::config::ConfigBuilder;
+use codex_core::config::LoaderOverrides;
 use codex_exec_server::EnvironmentManager;
 use codex_exec_server::ExecutorCapabilityDiscoveryCache;
 use codex_exec_server::LOCAL_ENVIRONMENT_ID;
@@ -53,20 +53,24 @@ async fn selected_plugin_servers_use_managed_requirements_for_the_selected_root_
   }
 }"#,
     )?;
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
+    let requirements_path = codex_home.path().join("requirements.toml");
+    std::fs::write(
+        &requirements_path,
+        r#"
 [plugins."selected-root".mcp_servers.allowed.identity]
 command = "allowed-command"
 
 [plugins."selected-root".mcp_servers.mismatched.identity]
 command = "expected-command"
 "#,
-            ),
-        )
+    )?;
+    let config = ConfigBuilder::default()
+        .codex_home(codex_home.path().to_path_buf())
+        .fallback_cwd(Some(codex_home.path().to_path_buf()))
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..Default::default()
+        })
         .build()
         .await?;
 

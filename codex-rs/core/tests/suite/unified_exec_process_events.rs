@@ -8,7 +8,7 @@ use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::Op;
 use codex_protocol::user_input::UserInput;
-use core_test_support::managed_network_requirements_loader;
+use core_test_support::managed_network_requirements_overrides;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
 use core_test_support::responses::ev_function_call;
@@ -429,7 +429,7 @@ async fn exec_command_consumes_pushed_remote_process_events(
     let mut builder = test_codex().with_exec_server_url(exec_server_url);
     if managed_network {
         builder = builder
-            .with_cloud_config_bundle(managed_network_requirements_loader())
+            .with_loader_overrides(managed_network_requirements_overrides())
             .with_pre_build_hook(|home| {
                 fs::write(
                     home.join("config.toml"),

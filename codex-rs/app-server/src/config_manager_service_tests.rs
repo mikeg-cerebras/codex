@@ -7,7 +7,6 @@ use codex_app_server_protocol::AskForApproval;
 use codex_app_server_protocol::ConfigLayerSource as ApiConfigLayerSource;
 use codex_config::CloudConfigBundleLoader;
 use codex_config::LoaderOverrides;
-use codex_config::test_support::CloudConfigBundleFixture;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use pretty_assertions::assert_eq;
 use tempfile::tempdir;
@@ -737,17 +736,24 @@ async fn reserved_builtin_provider_override_rejected() {
 async fn write_value_rejects_feature_requirement_conflict() {
     let tmp = tempdir().expect("tempdir");
     std::fs::write(tmp.path().join(CONFIG_TOML_FILE), "").unwrap();
+    let requirements_path = tmp.path().join("requirements.toml");
+    std::fs::write(
+        &requirements_path,
+        r#"
+[features]
+personality = true
+"#,
+    )
+    .unwrap();
 
     let service = ConfigManager::new_for_tests(
         tmp.path().to_path_buf(),
         vec![],
-        LoaderOverrides::without_managed_config_for_tests(),
-        CloudConfigBundleFixture::loader_with_enterprise_requirement(
-            r#"
-[features]
-personality = true
-"#,
-        ),
+        LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        },
+        CloudConfigBundleLoader::default(),
     );
 
     let error = service
@@ -782,12 +788,17 @@ async fn write_value_rejects_exact_managed_requirement() {
     let tmp = tempdir().expect("tempdir");
     let path = tmp.path().join(CONFIG_TOML_FILE);
     std::fs::write(&path, "allow_login_shell = true\n").unwrap();
+    let requirements_path = tmp.path().join("requirements.toml");
+    std::fs::write(&requirements_path, "allow_login_shell = false").unwrap();
 
     let service = ConfigManager::new_for_tests(
         tmp.path().to_path_buf(),
         vec![],
-        LoaderOverrides::without_managed_config_for_tests(),
-        CloudConfigBundleFixture::loader_with_enterprise_requirement("allow_login_shell = false"),
+        LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        },
+        CloudConfigBundleLoader::default(),
     );
 
     let error = service
@@ -845,11 +856,16 @@ enabled = false
 "#,
             toml_path(tmp.path(), "managed-sqlite"),
         );
+        let requirements_path = tmp.path().join("requirements.toml");
+        std::fs::write(&requirements_path, requirements).unwrap();
         let service = ConfigManager::new_for_tests(
             tmp.path().to_path_buf(),
             vec![],
-            LoaderOverrides::without_managed_config_for_tests(),
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(requirements),
+            LoaderOverrides {
+                system_requirements_path: Some(requirements_path),
+                ..LoaderOverrides::without_managed_config_for_tests()
+            },
+            CloudConfigBundleLoader::default(),
         );
 
         let response = service
@@ -904,17 +920,24 @@ async fn write_value_allows_unmanaged_sibling_of_exact_requirement() {
     let tmp = tempdir().expect("tempdir");
     let path = tmp.path().join(CONFIG_TOML_FILE);
     std::fs::write(&path, "").unwrap();
+    let requirements_path = tmp.path().join("requirements.toml");
+    std::fs::write(
+        &requirements_path,
+        r#"
+[windows]
+sandbox_private_desktop = false
+"#,
+    )
+    .unwrap();
 
     let service = ConfigManager::new_for_tests(
         tmp.path().to_path_buf(),
         vec![],
-        LoaderOverrides::without_managed_config_for_tests(),
-        CloudConfigBundleFixture::loader_with_enterprise_requirement(
-            r#"
-[windows]
-sandbox_private_desktop = false
-"#,
-        ),
+        LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        },
+        CloudConfigBundleLoader::default(),
     );
 
     service

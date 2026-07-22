@@ -1485,17 +1485,17 @@ mod tests {
         Ok(())
     }
 
-    // Regression coverage for `/new` and `/clear`: cloud requirements
+    // Regression coverage for `/new` and `/clear`: the cloud config bundle
     // must survive the config refresh that runs before thread transitions.
     #[tokio::test]
-    async fn refresh_in_memory_config_from_disk_keeps_cloud_requirements_for_thread_transitions()
+    async fn refresh_in_memory_config_from_disk_keeps_cloud_config_for_thread_transitions()
     -> Result<()> {
         let mut app = make_test_app().await;
         let codex_home = tempdir()?;
         let required_policy = codex_protocol::protocol::AskForApproval::Never;
         let cloud_config_bundle =
-            codex_config::test_support::CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"allowed_approval_policies = ["never"]"#,
+            codex_config::test_support::CloudConfigBundleFixture::loader_with_enterprise_config(
+                r#"approval_policy = "never""#,
             );
 
         let config = ConfigBuilder::default()
@@ -1506,7 +1506,7 @@ mod tests {
             .await?;
         app.config = config;
         app.cloud_config_bundle = cloud_config_bundle;
-        let app_id = "unit_test_cloud_requirements_reload_marker";
+        let app_id = "unit_test_cloud_config_reload_marker";
         std::fs::write(
             codex_home.path().join("config.toml"),
             format!(
@@ -1517,20 +1517,12 @@ enabled = false
             ),
         )?;
 
-        let assert_cloud_requirements = |app: &App| {
+        let assert_cloud_config = |app: &App| {
             let config = app.fresh_session_config();
-            assert_eq!(
-                config
-                    .config_layer_stack
-                    .requirements_toml()
-                    .allowed_approval_policies
-                    .clone(),
-                Some(vec![required_policy])
-            );
             assert_eq!(config.permissions.approval_policy.value(), required_policy);
         };
 
-        assert_cloud_requirements(&app);
+        assert_cloud_config(&app);
         assert_eq!(app_enabled_in_effective_config(&app.config, app_id), None);
 
         // This is the fallible reload that the best-effort `/new`, `/clear`,
@@ -1541,7 +1533,7 @@ enabled = false
             app_enabled_in_effective_config(&app.config, app_id),
             Some(false)
         );
-        assert_cloud_requirements(&app);
+        assert_cloud_config(&app);
         Ok(())
     }
 

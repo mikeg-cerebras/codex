@@ -25,7 +25,7 @@ use codex_protocol::user_input::UserInput;
 use codex_utils_path_uri::PathUri;
 use core_test_support::PathBufExt;
 use core_test_support::PathExt;
-use core_test_support::managed_network_requirements_loader;
+use core_test_support::managed_network_requirements_overrides;
 use core_test_support::responses::ResponseMock;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
@@ -1184,7 +1184,7 @@ allow_local_binding = true
     let permission_profile_for_config = permission_profile.clone();
     let mut builder = test_codex()
         .with_home(home)
-        .with_cloud_config_bundle(managed_network_requirements_loader())
+        .with_loader_overrides(managed_network_requirements_overrides())
         .with_config(move |config| {
             config.use_experimental_unified_exec_tool = true;
             config

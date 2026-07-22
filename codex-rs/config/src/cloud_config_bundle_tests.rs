@@ -1,8 +1,5 @@
 use super::*;
 use crate::ConfigLayerSource;
-use crate::ConfigRequirementsToml;
-use crate::compose_requirements;
-use codex_protocol::protocol::AskForApproval;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
@@ -43,20 +40,6 @@ fn bundle_layers_preserve_enterprise_managed_bucket_order() {
                     },
                 ],
             },
-            requirements_toml: CloudRequirementsTomlBundle {
-                enterprise_managed: vec![
-                    CloudRequirementsFragment {
-                        id: "req_high".to_string(),
-                        name: "High requirements".to_string(),
-                        contents: "allowed_approval_policies = [\"on-request\"]".to_string(),
-                    },
-                    CloudRequirementsFragment {
-                        id: "req_low".to_string(),
-                        name: "Low requirements".to_string(),
-                        contents: "allowed_approval_policies = [\"never\"]".to_string(),
-                    },
-                ],
-            },
         },
         &base_dir,
     )
@@ -79,16 +62,6 @@ fn bundle_layers_preserve_enterprise_managed_bucket_order() {
             },
         ]
     );
-    assert_eq!(
-        compose_requirements(layers.enterprise_managed_requirements)
-            .expect("requirements should compose")
-            .expect("requirements should be present")
-            .into_toml(),
-        ConfigRequirementsToml {
-            allowed_approval_policies: Some(vec![AskForApproval::OnRequest]),
-            ..Default::default()
-        }
-    );
 }
 
 #[test]
@@ -103,9 +76,6 @@ fn bundle_layers_can_strict_validate_enterprise_managed_config() {
                     name: "Cloud config".to_string(),
                     contents: "unknown_key = true".to_string(),
                 }],
-            },
-            requirements_toml: CloudRequirementsTomlBundle {
-                enterprise_managed: Vec::new(),
             },
         },
         &base_dir,

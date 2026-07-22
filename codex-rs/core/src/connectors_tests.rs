@@ -6,7 +6,7 @@ use codex_config::AppsRequirementsToml;
 use codex_config::ConfigLayerStack;
 use codex_config::ConfigRequirements;
 use codex_config::ConfigRequirementsToml;
-use codex_config::test_support::CloudConfigBundleFixture;
+use codex_config::LoaderOverrides;
 use codex_config::types::ApprovalsReviewer;
 use codex_connectors::merge::plugin_connector_to_app_info;
 use codex_connectors::metadata::connector_install_url;
@@ -405,13 +405,18 @@ approvals_reviewer = "user"
 "#,
     )
     .expect("write config");
+    let requirements_path = codex_home.path().join("requirements.toml");
+    std::fs::write(
+        &requirements_path,
+        r#"allowed_approvals_reviewers = ["auto_review"]"#,
+    )
+    .expect("write requirements.toml");
     let config = ConfigBuilder::default()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"allowed_approvals_reviewers = ["auto_review"]"#,
-            ),
-        )
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..Default::default()
+        })
         .build()
         .await
         .expect("config should build");
@@ -435,13 +440,18 @@ approvals_reviewer = "user"
 "#,
     )
     .expect("write config");
+    let requirements_path = codex_home.path().join("requirements.toml");
+    std::fs::write(
+        &requirements_path,
+        r#"allowed_approvals_reviewers = ["auto_review"]"#,
+    )
+    .expect("write requirements.toml");
     let config = ConfigBuilder::default()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"allowed_approvals_reviewers = ["auto_review"]"#,
-            ),
-        )
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path),
+            ..Default::default()
+        })
         .build()
         .await
         .expect("config should build");

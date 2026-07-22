@@ -111,7 +111,6 @@ use rmcp::model::ElicitationCapability;
 use rmcp::model::FormElicitationCapability;
 use rmcp::model::UrlElicitationCapability;
 
-use codex_config::test_support::CloudConfigBundleFixture;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
@@ -1896,20 +1895,31 @@ respect_system_proxy = false
     Ok(())
 }
 
+fn write_requirements_toml(
+    codex_home: &TempDir,
+    contents: impl AsRef<str>,
+) -> std::io::Result<PathBuf> {
+    let path = codex_home.path().join("requirements.toml");
+    std::fs::write(&path, contents.as_ref())?;
+    Ok(path)
+}
+
 #[tokio::test]
 async fn experimental_network_requirements_enable_proxy_without_feature() -> std::io::Result<()> {
     let codex_home = TempDir::new()?;
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [experimental_network]
 enabled = true
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -5288,16 +5298,19 @@ enabled = true
 "#,
     )?;
 
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
+    let requirements_path = write_requirements_toml(
+        &codex_home,
+        r#"
 [plugins."sample@test".mcp_servers.sample.identity]
 url = "https://sample.example/mcp"
 "#,
-            ),
-        )
+    )?;
+    let config = ConfigBuilder::default()
+        .codex_home(codex_home.path().to_path_buf())
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path.clone()),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
     let plugins_manager = PluginsManager::new(codex_home.path().to_path_buf());
@@ -5317,9 +5330,8 @@ url = "https://sample.example/mcp"
         Some((
             false,
             Some(McpServerDisabledReason::Requirements {
-                source: RequirementSource::EnterpriseManaged {
-                    id: "req_1".to_string(),
-                    name: "Base requirements".to_string(),
+                source: RequirementSource::SystemRequirementsToml {
+                    file: requirements_path.abs(),
                 },
             })
         ))
@@ -5391,15 +5403,18 @@ enabled = true
 "#,
     )?;
 
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
+    let requirements_path = write_requirements_toml(
+        &codex_home,
+        r#"
 [mcp_servers]
 "#,
-            ),
-        )
+    )?;
+    let config = ConfigBuilder::default()
+        .codex_home(codex_home.path().to_path_buf())
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(requirements_path.clone()),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
     let plugins_manager = PluginsManager::new(codex_home.path().to_path_buf());
@@ -5413,9 +5428,8 @@ enabled = true
         Some((
             false,
             Some(McpServerDisabledReason::Requirements {
-                source: RequirementSource::EnterpriseManaged {
-                    id: "req_1".to_string(),
-                    name: "Base requirements".to_string(),
+                source: RequirementSource::SystemRequirementsToml {
+                    file: requirements_path.abs(),
                 },
             })
         ))
@@ -9953,11 +9967,13 @@ async fn requirements_disallowing_default_sandbox_falls_back_to_required_default
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
     assert_eq!(
@@ -9979,11 +9995,13 @@ async fn explicit_sandbox_mode_falls_back_when_disallowed_by_requirements() -> s
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
     assert_eq!(
@@ -10006,13 +10024,15 @@ sandbox = "unelevated"
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"[windows]
 allowed_sandbox_implementations = ["elevated"]
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10043,11 +10063,13 @@ sandbox_mode = "danger-full-access"
     let err = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await
         .expect_err("requirements-constrained yolo should require sandbox approval");
@@ -10077,11 +10099,13 @@ default_permissions = "dev"
     let err = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await
         .expect_err("requirements-constrained full-access profile should require sandbox approval");
@@ -10105,11 +10129,13 @@ async fn permission_profile_override_falls_back_when_disallowed_by_requirements(
             permission_profile: Some(PermissionProfile::Disabled),
             ..Default::default()
         })
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10132,11 +10158,13 @@ async fn active_profile_is_cleared_when_requirements_force_fallback() -> std::io
             default_permissions: Some(BUILT_IN_PERMISSION_PROFILE_DANGER_FULL_ACCESS.to_string()),
             ..Default::default()
         })
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_sandbox_modes = ["read-only"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10248,11 +10276,13 @@ async fn requirements_web_search_mode_overrides_danger_full_access_default() -> 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_web_search_modes = ["cached"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10286,11 +10316,13 @@ trust_level = "untrusted"
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(workspace.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_approval_policies = ["on-request"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10314,11 +10346,13 @@ async fn explicit_approval_policy_falls_back_when_disallowed_by_requirements() -
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_approval_policies = ["on-request"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
     assert_eq!(
@@ -10334,15 +10368,17 @@ async fn feature_requirements_normalize_effective_feature_values() -> std::io::R
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 personality = true
 shell_tool = false
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10366,14 +10402,16 @@ async fn feature_requirements_auto_review_disables_guardian_approval() -> std::i
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 auto_review = false
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10388,16 +10426,18 @@ async fn browser_feature_requirements_are_valid() -> std::io::Result<()> {
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 in_app_browser = false
 browser_use = false
 browser_use_full_cdp_access = false
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10494,15 +10534,17 @@ shell_tool = true
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 personality = true
 shell_tool = false
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10612,11 +10654,13 @@ async fn requirements_disallowing_default_approvals_reviewer_falls_back_to_requi
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_approvals_reviewers = ["guardian_subagent"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10637,11 +10681,13 @@ async fn root_approvals_reviewer_falls_back_when_disallowed_by_requirements() ->
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_approvals_reviewers = ["guardian_subagent"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -10674,13 +10720,12 @@ async fn profile_approvals_reviewer_falls_back_when_disallowed_by_requirements()
         .loader_overrides(LoaderOverrides {
             user_config_path: Some(selected_config.abs()),
             user_config_profile: Some("default".parse().expect("profile-v2 name")),
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
+                r#"allowed_approvals_reviewers = ["guardian_subagent"]"#,
+            )?),
             ..LoaderOverrides::without_managed_config_for_tests()
         })
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"allowed_approvals_reviewers = ["guardian_subagent"]"#,
-            ),
-        )
         .build()
         .await?;
 
@@ -10701,11 +10746,13 @@ async fn approvals_reviewer_preserves_valid_user_choice_when_allowed_by_requirem
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"allowed_approvals_reviewers = ["user", "guardian_subagent"]"#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -11329,15 +11376,17 @@ async fn feature_requirements_normalize_runtime_feature_mutations() -> std::io::
 
     let mut config = ConfigBuilder::default()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 personality = true
 shell_tool = false
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -11363,14 +11412,16 @@ async fn feature_requirements_warn_on_collab_legacy_alias() -> std::io::Result<(
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 collab = true
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -11393,14 +11444,16 @@ async fn feature_requirements_warn_and_ignore_unknown_feature() -> std::io::Resu
 
     let config = ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                &codex_home,
                 r#"
 [features]
 made_up_feature = true
 "#,
-            ),
-        )
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await?;
 
@@ -11969,9 +12022,13 @@ async fn load_with_enterprise_requirement(
     ConfigBuilder::without_managed_config_for_tests()
         .codex_home(codex_home.path().to_path_buf())
         .fallback_cwd(Some(codex_home.path().to_path_buf()))
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(requirements),
-        )
+        .loader_overrides(LoaderOverrides {
+            system_requirements_path: Some(write_requirements_toml(
+                codex_home,
+                requirements.into(),
+            )?),
+            ..LoaderOverrides::without_managed_config_for_tests()
+        })
         .build()
         .await
 }

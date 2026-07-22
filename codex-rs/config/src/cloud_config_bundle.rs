@@ -1,13 +1,11 @@
 //! Cloud config bundle domain model and shared in-memory loader.
 //!
-//! The backend bundle groups cloud-delivered config and requirements fragments
-//! by source bucket. `CloudConfigBundleLayers` converts those raw buckets into
-//! layer entries while preserving each bucket's insertion semantics.
+//! The backend bundle groups cloud-delivered config fragments by source
+//! bucket. `CloudConfigBundleLayers` converts those raw buckets into layer
+//! entries while preserving each bucket's insertion semantics.
 
 use crate::CloudConfigFragment;
 use crate::ConfigLayerEntry;
-use crate::RequirementSource;
-use crate::RequirementsLayerEntry;
 use crate::cloud_config_layers::CloudConfigLayerError;
 use crate::cloud_config_layers::cloud_config_layers_from_fragments_strict;
 use crate::cloud_config_layers_from_fragments;
@@ -24,41 +22,22 @@ use thiserror::Error;
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CloudConfigBundle {
     pub config_toml: CloudConfigTomlBundle,
-    pub requirements_toml: CloudRequirementsTomlBundle,
 }
 
 impl CloudConfigBundle {
     pub fn is_empty(&self) -> bool {
-        let CloudConfigBundle {
-            config_toml,
-            requirements_toml,
-        } = self;
+        let CloudConfigBundle { config_toml } = self;
         let CloudConfigTomlBundle {
             enterprise_managed: config_enterprise_managed,
         } = config_toml;
-        let CloudRequirementsTomlBundle {
-            enterprise_managed: requirements_enterprise_managed,
-        } = requirements_toml;
 
-        config_enterprise_managed.is_empty() && requirements_enterprise_managed.is_empty()
+        config_enterprise_managed.is_empty()
     }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CloudConfigTomlBundle {
     pub enterprise_managed: Vec<CloudConfigFragment>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct CloudRequirementsTomlBundle {
-    pub enterprise_managed: Vec<CloudRequirementsFragment>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct CloudRequirementsFragment {
-    pub id: String,
-    pub name: String,
-    pub contents: String,
 }
 
 /// Cloud config bundle converted into semantic layer buckets.
@@ -69,8 +48,6 @@ pub struct CloudRequirementsFragment {
 pub struct CloudConfigBundleLayers {
     /// Enterprise-managed config layers in `ConfigLayerStack` order.
     pub enterprise_managed_config: Vec<ConfigLayerEntry>,
-    /// Enterprise-managed requirements layers in requirements layer merge order.
-    pub enterprise_managed_requirements: Vec<RequirementsLayerEntry>,
 }
 
 impl CloudConfigBundleLayers {
@@ -100,10 +77,6 @@ impl CloudConfigBundleLayers {
                 CloudConfigTomlBundle {
                     enterprise_managed: config_enterprise_managed,
                 },
-            requirements_toml:
-                CloudRequirementsTomlBundle {
-                    enterprise_managed: requirements_enterprise_managed,
-                },
         } = bundle;
 
         let enterprise_managed_config = if strict_config {
@@ -112,26 +85,8 @@ impl CloudConfigBundleLayers {
             cloud_config_layers_from_fragments(config_enterprise_managed, base_dir)?
         };
 
-        let mut enterprise_managed_requirements = requirements_enterprise_managed
-            .into_iter()
-            .map(|fragment| {
-                RequirementsLayerEntry::from_toml(
-                    RequirementSource::EnterpriseManaged {
-                        id: fragment.id,
-                        name: fragment.name,
-                    },
-                    fragment.contents,
-                )
-                .with_base_dir(base_dir.clone())
-            })
-            .collect::<Vec<_>>();
-        // Bundle fragments arrive highest-priority first, while requirements
-        // layers are merged lowest-priority to highest-priority.
-        enterprise_managed_requirements.reverse();
-
         Ok(Self {
             enterprise_managed_config,
-            enterprise_managed_requirements,
         })
     }
 }

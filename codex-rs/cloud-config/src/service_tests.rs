@@ -13,8 +13,6 @@ use codex_backend_client::DeliveredTomlFragment;
 use codex_config::AbsolutePathBuf;
 use codex_config::CloudConfigFragment;
 use codex_config::CloudConfigTomlBundle;
-use codex_config::CloudRequirementsFragment;
-use codex_config::CloudRequirementsTomlBundle;
 use codex_config::types::AuthCredentialsStoreMode;
 use codex_login::AuthKeyringBackendKind;
 use codex_login::auth::AgentIdentityAuth;
@@ -180,9 +178,6 @@ fn test_bundle() -> CloudConfigBundle {
         config_toml: CloudConfigTomlBundle {
             enterprise_managed: vec![test_config_fragment()],
         },
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: vec![test_requirements_fragment()],
-        },
     }
 }
 
@@ -191,14 +186,6 @@ fn test_config_fragment() -> CloudConfigFragment {
         id: "cfg_1".to_string(),
         name: "Base config".to_string(),
         contents: "model = \"gpt-5\"".to_string(),
-    }
-}
-
-fn test_requirements_fragment() -> CloudRequirementsFragment {
-    CloudRequirementsFragment {
-        id: "req_1".to_string(),
-        name: "Base requirements".to_string(),
-        contents: "allowed_approval_policies = [\"never\"]".to_string(),
     }
 }
 
@@ -211,7 +198,6 @@ fn invalid_config_bundle() -> CloudConfigBundle {
                 contents: "model = [".to_string(),
             }],
         },
-        requirements_toml: CloudRequirementsTomlBundle::default(),
     }
 }
 
@@ -356,29 +342,8 @@ fn bundle_shape_tag_describes_sorted_enterprise_sources() {
             config_toml: CloudConfigTomlBundle {
                 enterprise_managed: vec![test_config_fragment()],
             },
-            requirements_toml: CloudRequirementsTomlBundle::default(),
         })),
         "enterprise_config"
-    );
-    assert_eq!(
-        bundle_shape_tag(Some(&CloudConfigBundle {
-            config_toml: CloudConfigTomlBundle::default(),
-            requirements_toml: CloudRequirementsTomlBundle {
-                enterprise_managed: vec![test_requirements_fragment()],
-            },
-        })),
-        "enterprise_requirements"
-    );
-    assert_eq!(
-        bundle_shape_tag(Some(&CloudConfigBundle {
-            config_toml: CloudConfigTomlBundle {
-                enterprise_managed: vec![test_config_fragment()],
-            },
-            requirements_toml: CloudRequirementsTomlBundle {
-                enterprise_managed: vec![test_requirements_fragment()],
-            },
-        })),
-        "enterprise_config,enterprise_requirements"
     );
 }
 
@@ -611,12 +576,11 @@ async fn get_bundle_ignores_cache_for_different_auth_identity() {
     let _ = prime_service.load_startup_bundle().await;
 
     let replacement_bundle = CloudConfigBundle {
-        config_toml: CloudConfigTomlBundle::default(),
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: vec![CloudRequirementsFragment {
-                id: "req_2".to_string(),
-                name: "Replacement requirements".to_string(),
-                contents: "allowed_approval_policies = [\"on-request\"]".to_string(),
+        config_toml: CloudConfigTomlBundle {
+            enterprise_managed: vec![CloudConfigFragment {
+                id: "cfg_2".to_string(),
+                name: "Replacement config".to_string(),
+                contents: "model = \"replacement\"".to_string(),
             }],
         },
     };
@@ -938,12 +902,11 @@ async fn get_bundle_does_not_use_cache_when_auth_identity_is_incomplete() {
     let _ = prime_service.load_startup_bundle().await;
 
     let replacement_bundle = CloudConfigBundle {
-        config_toml: CloudConfigTomlBundle::default(),
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: vec![CloudRequirementsFragment {
-                id: "req_2".to_string(),
-                name: "Replacement requirements".to_string(),
-                contents: "allowed_approval_policies = [\"on-request\"]".to_string(),
+        config_toml: CloudConfigTomlBundle {
+            enterprise_managed: vec![CloudConfigFragment {
+                id: "cfg_2".to_string(),
+                name: "Replacement config".to_string(),
+                contents: "model = \"replacement\"".to_string(),
             }],
         },
     };
@@ -1003,12 +966,11 @@ async fn get_bundle_stops_after_max_retries() {
 #[tokio::test]
 async fn refresh_from_remote_updates_cached_bundle() {
     let replacement_bundle = CloudConfigBundle {
-        config_toml: CloudConfigTomlBundle::default(),
-        requirements_toml: CloudRequirementsTomlBundle {
-            enterprise_managed: vec![CloudRequirementsFragment {
-                id: "req_2".to_string(),
-                name: "Replacement requirements".to_string(),
-                contents: "allowed_approval_policies = [\"on-request\"]".to_string(),
+        config_toml: CloudConfigTomlBundle {
+            enterprise_managed: vec![CloudConfigFragment {
+                id: "cfg_2".to_string(),
+                name: "Replacement config".to_string(),
+                contents: "model = \"replacement\"".to_string(),
             }],
         },
     };
@@ -1053,16 +1015,7 @@ fn bundle_response_conversion_preserves_fragment_order() {
             ])),
             managed_layers: None,
         }))),
-        requirements_toml: Some(Some(Box::new(
-            codex_backend_client::DeliveredRequirementsToml {
-                enterprise_managed: Some(Some(vec![DeliveredTomlFragment::new(
-                    "req_high".to_string(),
-                    "High requirements".to_string(),
-                    "allowed_approval_policies = [\"never\"]".to_string(),
-                )])),
-                managed_layers: None,
-            },
-        ))),
+        requirements_toml: None,
     };
 
     assert_eq!(
@@ -1081,13 +1034,6 @@ fn bundle_response_conversion_preserves_fragment_order() {
                         contents: "model = \"low\"".to_string(),
                     },
                 ],
-            },
-            requirements_toml: CloudRequirementsTomlBundle {
-                enterprise_managed: vec![CloudRequirementsFragment {
-                    id: "req_high".to_string(),
-                    name: "High requirements".to_string(),
-                    contents: "allowed_approval_policies = [\"never\"]".to_string(),
-                }],
             },
         }
     );

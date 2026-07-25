@@ -2186,14 +2186,19 @@ mod tests {
                     .feature_requirements
                     .as_ref(),
             )?;
-            let cloud_config_bundle =
-                codex_config::test_support::CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                    format!("[features]\nrespect_system_proxy = {managed_respect_system_proxy}\n"),
-                );
+            // Scope the managed requirement to the final config build only: the
+            // bootstrap load above must not see it, so the two HTTP policies differ.
+            let requirements_path = codex_home.path().join("requirements.toml");
+            std::fs::write(
+                &requirements_path,
+                format!("[features]\nrespect_system_proxy = {managed_respect_system_proxy}\n"),
+            )?;
             let config = ConfigBuilder::default()
                 .codex_home(codex_home.path().to_path_buf())
-                .loader_overrides(loader_overrides)
-                .cloud_config_bundle(cloud_config_bundle)
+                .loader_overrides(LoaderOverrides {
+                    system_requirements_path: Some(requirements_path),
+                    ..loader_overrides
+                })
                 .build()
                 .await?;
             let runtime_paths = ExecServerRuntimePaths::new(
